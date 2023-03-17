@@ -21,7 +21,7 @@ public import moss.container.process;
 import moss.container.context;
 import std.exception : enforce;
 import std.experimental.logger;
-import std.file : exists, remove, symlink, mkdirRecurse, copy;
+import std.file : copy, exists, mkdirRecurse, remove, symlink, write;
 import std.process;
 import std.path : dirName;
 import std.stdio : stderr, stdin, stdout;
@@ -39,22 +39,24 @@ public final class Container
     {
         /* Default mount points */
         mountPoints = [
-            Mount("proc", context.joinPath("/proc"), "proc",
-                    MountFlags.NoSuid | MountFlags.NoDev | MountFlags.NoExec
-                    | MountFlags.RelativeAccessTime),
-            Mount("sysfs", context.joinPath("/sys"), "sysfs",
-                    MountFlags.NoSuid | MountFlags.NoDev | MountFlags.NoExec
-                    | MountFlags.RelativeAccessTime),
-            Mount("tmpfs", context.joinPath("/tmp"), "tmpfs",
-                    MountFlags.NoSuid | MountFlags.NoDev),
+            Mount("", context.joinPath("/proc"), "proc", MountMode.None,
+                    MountProperties(MountAttr.NoSUID | MountAttr.NoDev | MountAttr.NoExec | MountAttr.RelATime).nullable),
+            Mount("/sys", context.joinPath("/sys"), "", MountMode.Bind | MountMode.Recursive,
+                    MountProperties(MountAttr.ReadOnly, cast(MountAttr)0, MountPropagation.Slave).nullable),
+            Mount("", context.joinPath("/tmp"), "tmpfs", MountMode.None,
+                    MountProperties(MountAttr.NoSUID | MountAttr.NoDev).nullable)
+        ];
 
-            /* /dev points */
-            Mount("tmpfs", context.joinPath("/dev"), "tmpfs",
-                    MountFlags.NoSuid | MountFlags.NoExec),
-            Mount("tmpfs", context.joinPath("/dev/shm"), "tmpfs",
-                    MountFlags.NoSuid | MountFlags.NoDev),
-            Mount("devpts", context.joinPath("/dev/pts"), "devpts",
-                    MountFlags.NoSuid | MountFlags.NoExec | MountFlags.RelativeAccessTime),
+        /* /dev points */
+        auto dev = Mount("", context.joinPath("/dev"), "tmpfs", MountMode.None,
+                MountProperties(MountAttr.NoSUID | MountAttr.NoExec).nullable, UnmountFlags.Detach);
+        dev.setData("mode=777".toStringz());
+        mountPoints ~= [
+            dev,
+            Mount("", context.joinPath("/dev/shm"), "tmpfs", MountMode.None,
+                    MountProperties(MountAttr.NoSUID | MountAttr.NoDev).nullable),
+            Mount("", context.joinPath("/dev/pts"), "devpts", MountMode.None,
+                    MountProperties(MountAttr.NoSUID | MountAttr.NoExec | MountAttr.RelATime).nullable),
         ];
     }
 
@@ -136,7 +138,7 @@ private:
     {
         foreach_reverse (ref m; mountPoints)
         {
-            m.unmountFlags = UnmountFlags.Force | UnmountFlags.Detach;
+            //m.unmountFlags = UnmountFlags.Detach;
             auto err = m.unmount();
             if (!err.isNull())
             {
@@ -150,7 +152,6 @@ private:
      */
     void configureDevfs()
     {
-
         auto symlinkSources = [
             "/proc/self/fd", "/proc/self/fd/0", "/proc/self/fd/1",
             "/proc/self/fd/2", "pts/ptmx"
@@ -160,13 +161,18 @@ private:
             "/dev/fd", "/dev/stdin", "/dev/stdout", "/dev/stderr", "/dev/ptmx"
         ];
 
-        static DeviceNode[] nodes = [
-            DeviceNode("/dev/null", S_IFCHR | octal!666, mkdev(1, 3)),
-            DeviceNode("/dev/zero", S_IFCHR | octal!666, mkdev(1, 5)),
-            DeviceNode("/dev/full", S_IFCHR | octal!666, mkdev(1, 7)),
-            DeviceNode("/dev/random", S_IFCHR | octal!666, mkdev(1, 8)),
-            DeviceNode("/dev/urandom", S_IFCHR | octal!666, mkdev(1, 9)),
-            DeviceNode("/dev/tty", S_IFCHR | octal!666, mkdev(5, 0)),
+        /* Can't use mknod because we want to support unprivileged containers
+         * like Podman or Docker. Let's bind mount existing nodes to circumvent
+         * this limitation.
+         */
+        Mount[] nodes = [
+            Mount("/dev/null", context.joinPath("/dev/null"), "", MountMode.Bind),
+            Mount("/dev/zero", context.joinPath("/dev/zero"), "", MountMode.Bind),
+            Mount("/dev/full", context.joinPath("/dev/full"), "", MountMode.Bind),
+            Mount("/dev/random", context.joinPath("/dev/random"), "", MountMode.Bind),
+            Mount("/dev/urandom", context.joinPath("/dev/urandom"), "",
+                    MountMode.Bind),
+            Mount("/dev/tty", context.joinPath("/dev/tty"), "", MountMode.Bind),
         ];
 
         /* Link sources to targets */
@@ -188,7 +194,8 @@ private:
         /* Create our nodes */
         foreach (ref n; nodes)
         {
-            n.create();
+            write(n.target, null); /* Create the empty file first. */
+            n.mount();
         }
     }
 
