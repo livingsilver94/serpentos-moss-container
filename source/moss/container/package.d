@@ -42,7 +42,7 @@ public final class Container
             Mount("", context.joinPath("/proc"), "proc", MountMode.None,
                     MountProperties(MountAttr.NoSUID | MountAttr.NoDev | MountAttr.NoExec | MountAttr.RelATime).nullable),
             Mount("/sys", context.joinPath("/sys"), "", MountMode.Bind | MountMode.Recursive,
-                    MountProperties(MountAttr.ReadOnly, cast(MountAttr)0, MountPropagation.Slave).nullable),
+                    MountProperties(MountAttr.ReadOnly, cast(MountAttr)0, MountPropagation.Slave).nullable, UnmountFlags.Detach),
             Mount("", context.joinPath("/tmp"), "tmpfs", MountMode.None,
                     MountProperties(MountAttr.NoSUID | MountAttr.NoDev).nullable)
         ];
