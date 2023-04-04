@@ -39,24 +39,24 @@ public final class Container
     {
         /* Default mount points */
         mountPoints = [
-            Mount("", context.joinPath("/proc"), "proc", MountMode.None,
-                    MountProperties(MountAttr.NoSUID | MountAttr.NoDev | MountAttr.NoExec | MountAttr.RelATime).nullable),
-            Mount("/sys", context.joinPath("/sys"), "", MountMode.Bind | MountMode.Recursive,
-                    MountProperties(MountAttr.ReadOnly, cast(MountAttr)0, MountPropagation.Slave).nullable, UnmountFlags.Detach),
-            Mount("", context.joinPath("/tmp"), "tmpfs", MountMode.None,
-                    MountProperties(MountAttr.NoSUID | MountAttr.NoDev).nullable)
+            Mount("", context.joinPath("/proc"), "proc", MS.NONE,
+                    mount_attr(MOUNT_ATTR.NOSUID | MOUNT_ATTR.NODEV | MOUNT_ATTR.NOEXEC | MOUNT_ATTR.RELATIME).nullable),
+            Mount("/sys", context.joinPath("/sys"), "", MS.BIND | MS.REC,
+                    mount_attr(MOUNT_ATTR.RDONLY, cast(MOUNT_ATTR)0, MS.SLAVE).nullable, MNT.DETACH),
+            Mount("", context.joinPath("/tmp"), "tmpfs", MS.NONE,
+                    mount_attr(MOUNT_ATTR.NOSUID | MOUNT_ATTR.NODEV).nullable)
         ];
 
         /* /dev points */
-        auto dev = Mount("", context.joinPath("/dev"), "tmpfs", MountMode.None,
-                MountProperties(MountAttr.NoSUID | MountAttr.NoExec).nullable, UnmountFlags.Detach);
+        auto dev = Mount("", context.joinPath("/dev"), "tmpfs", MS.NONE,
+                mount_attr(MOUNT_ATTR.NOSUID | MOUNT_ATTR.NOEXEC).nullable, MNT.DETACH);
         dev.setData("mode=777".toStringz());
         mountPoints ~= [
             dev,
-            Mount("", context.joinPath("/dev/shm"), "tmpfs", MountMode.None,
-                    MountProperties(MountAttr.NoSUID | MountAttr.NoDev).nullable),
-            Mount("", context.joinPath("/dev/pts"), "devpts", MountMode.None,
-                    MountProperties(MountAttr.NoSUID | MountAttr.NoExec | MountAttr.RelATime).nullable),
+            Mount("", context.joinPath("/dev/shm"), "tmpfs", MS.NONE,
+                    mount_attr(MOUNT_ATTR.NOSUID | MOUNT_ATTR.NODEV).nullable),
+            Mount("", context.joinPath("/dev/pts"), "devpts", MS.NONE,
+                    mount_attr(MOUNT_ATTR.NOSUID | MOUNT_ATTR.NOEXEC | MOUNT_ATTR.RELATIME).nullable),
         ];
     }
 
@@ -166,13 +166,13 @@ private:
          * this limitation.
          */
         Mount[] nodes = [
-            Mount("/dev/null", context.joinPath("/dev/null"), "", MountMode.Bind),
-            Mount("/dev/zero", context.joinPath("/dev/zero"), "", MountMode.Bind),
-            Mount("/dev/full", context.joinPath("/dev/full"), "", MountMode.Bind),
-            Mount("/dev/random", context.joinPath("/dev/random"), "", MountMode.Bind),
+            Mount("/dev/null", context.joinPath("/dev/null"), "", MS.BIND),
+            Mount("/dev/zero", context.joinPath("/dev/zero"), "", MS.BIND),
+            Mount("/dev/full", context.joinPath("/dev/full"), "", MS.BIND),
+            Mount("/dev/random", context.joinPath("/dev/random"), "", MS.BIND),
             Mount("/dev/urandom", context.joinPath("/dev/urandom"), "",
-                    MountMode.Bind),
-            Mount("/dev/tty", context.joinPath("/dev/tty"), "", MountMode.Bind),
+                    MS.BIND),
+            Mount("/dev/tty", context.joinPath("/dev/tty"), "", MS.BIND),
         ];
 
         /* Link sources to targets */
